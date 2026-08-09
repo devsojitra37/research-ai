@@ -1,0 +1,444 @@
+// ===========================================
+// ResearchAI — Database Schema
+// ===========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Authentication & Users ──────────────────────────────
+
+enum UserRole {
+  USER
+  RESEARCHER
+  INSTITUTION_ADMIN
+  SUPER_ADMIN
+}
+
+enum UserType {
+  STUDENT
+  RESEARCHER
+  PROFESSOR
+  INSTITUTION
+  OTHER
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  name                String?
+  email               String    @unique
+  emailVerified       DateTime?
+  image               String?
+  password            String?
+  role                UserRole  @default(USER)
+  userType            UserType?
+  researchAreas       String[]
+  onboardingCompleted Boolean   @default(false)
+  referralCode        String?   @unique
+  referredBy          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  accounts            Account[]
+  sessions            Session[]
+  profile             Profile?
+  projects            Project[]
+  documents           Document[]
+  subscription        Subscription?
+  creditBalance       CreditBalance?
+  creditTransactions  CreditTransaction[]
+  payments            Payment[]
+  notifications       Notification[]
+  aiRequests          AIRequest[]
+  supportTickets      SupportTicket[]
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Profiles ───────────────────────────────────────────
+
+model Profile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  bio               String?  @db.Text
+  institution       String?
+  department        String?
+  researchInterests String[]
+  website           String?
+  linkedin          String?
+  twitter           String?
+  googleScholar     String?
+  orcid             String?
+  isPublic          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+// ─── Subscriptions & Billing ────────────────────────────
+
+enum PlanSlug {
+  FREE
+  STUDENT
+  RESEARCHER
+  INSTITUTION
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  name          String
+  slug          PlanSlug @unique
+  description   String?
+  monthlyPrice  Int      @default(0)
+  yearlyPrice   Int      @default(0)
+  currency      String   @default("INR")
+  monthlyCredits Int     @default(0)
+  maxDocuments  Int      @default(0)
+  features      Json     @default("{}")
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+  EXPIRED
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  planId             String
+  status             SubscriptionStatus @default(ACTIVE)
+  billingCycle       String             @default("monthly")
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime
+  cancelledAt        DateTime?
+  paymentProvider    String?
+  externalId         String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  userId          String
+  amount          Int
+  currency        String        @default("INR")
+  status          PaymentStatus @default(PENDING)
+  provider        String?
+  externalId      String?       @unique
+  invoiceUrl      String?
+  description     String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model CreditBalance {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  amount    Int      @default(0)
+  resetDate DateTime?
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("credit_balances")
+}
+
+enum CreditTransactionType {
+  EARNED
+  SPENT
+  PURCHASED
+  RESET
+  REFERRAL
+}
+
+model CreditTransaction {
+  id          String                @id @default(cuid())
+  userId      String
+  amount      Int
+  type        CreditTransactionType
+  description String?
+  featureUsed String?
+  createdAt   DateTime              @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("credit_transactions")
+}
+
+// ─── Projects & Documents ───────────────────────────────
+
+enum ProjectVisibility {
+  PRIVATE
+  LINK
+  PUBLIC
+}
+
+model Project {
+  id          String            @id @default(cuid())
+  userId      String
+  name        String
+  description String?           @db.Text
+  visibility  ProjectVisibility @default(PRIVATE)
+  shareToken  String?           @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@index([userId])
+  @@map("projects")
+}
+
+enum DocumentStatus {
+  UPLOADING
+  UPLOADED
+  EXTRACTING
+  ANALYZING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+model Document {
+  id          String         @id @default(cuid())
+  projectId   String?
+  userId      String
+  fileName    String
+  fileSize    Int
+  fileType    String
+  storageKey  String
+  status      DocumentStatus @default(UPLOADING)
+  textContent String?        @db.Text
+  metadata    Json?
+  errorMessage String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  analysis DocumentAnalysis?
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("documents")
+}
+
+// ─── AI Analysis ────────────────────────────────────────
+
+enum AnalysisStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model DocumentAnalysis {
+  id              String         @id @default(cuid())
+  documentId      String         @unique
+  status          AnalysisStatus @default(QUEUED)
+  shortSummary    String?        @db.Text
+  detailedSummary String?        @db.Text
+  executiveSummary String?       @db.Text
+  keyFindings     Json?
+  researchObjective String?      @db.Text
+  methodology     String?        @db.Text
+  results         String?        @db.Text
+  conclusion      String?        @db.Text
+  keywords        String[]
+  simpleSummary   String?        @db.Text
+  qualityScore    Json?
+  citations       Json?
+  similarityReport Json?
+  structureAnalysis Json?
+  metadata        Json?
+  errorMessage    String?
+  processedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_analyses")
+}
+
+model AIRequest {
+  id           String   @id @default(cuid())
+  userId       String
+  type         String
+  provider     String?
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  cost         Float?
+  duration     Int?
+  status       String   @default("completed")
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_requests")
+}
+
+// ─── System ─────────────────────────────────────────────
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  userId      String
+  subject     String
+  description String   @db.Text
+  status      String   @default("open")
+  priority    String   @default("medium")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("support_tickets")
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  enabled     Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("feature_flags")
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?  @db.Text
+  content     String   @db.Text
+  coverImage  String?
+  category    String?
+  tags        String[]
+  authorName  String?
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("blog_posts")
+}
