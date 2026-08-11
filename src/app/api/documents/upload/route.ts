@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { aiService } from "@/lib/ai-service";
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -68,6 +69,9 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
+    // Run AI analysis
+    const analysisData = await aiService.analyzeDocument("", file.name);
+
     // Create document record
     const document = await prisma.document.create({
       data: {
@@ -76,15 +80,33 @@ export async function POST(req: NextRequest) {
         fileSize: file.size,
         fileType: file.type,
         storageKey: `${user.id}/${storageKey}`,
-        status: "UPLOADED",
+        status: "COMPLETED",
       },
     });
 
-    // Create analysis record (queued)
+    // Create completed analysis record
     await prisma.documentAnalysis.create({
       data: {
         documentId: document.id,
-        status: "QUEUED",
+        status: "COMPLETED",
+        shortSummary: analysisData.shortSummary,
+        detailedSummary: analysisData.detailedSummary,
+        executiveSummary: analysisData.executiveSummary,
+        keyFindings: JSON.stringify(analysisData.keyFindings),
+        researchObjective: analysisData.researchObjective,
+        methodology: analysisData.methodology,
+        results: analysisData.results,
+        conclusion: analysisData.conclusion,
+        keywords: JSON.stringify(analysisData.keywords),
+        simpleSummary: JSON.stringify(analysisData.simpleLanguage),
+        qualityScore: JSON.stringify(analysisData.qualityScore),
+        citations: JSON.stringify(analysisData.citations),
+        similarityReport: JSON.stringify(analysisData.similarityReport),
+        structureAnalysis: JSON.stringify({
+          charts: analysisData.chartSuggestions,
+          slides: analysisData.presentationSlides,
+        }),
+        processedAt: new Date(),
       },
     });
 
@@ -96,7 +118,7 @@ export async function POST(req: NextRequest) {
           fileSize: document.fileSize,
           status: document.status,
         },
-        message: "Document uploaded successfully. AI analysis will begin shortly.",
+        message: "Document uploaded and AI analysis completed!",
       },
       { status: 201 }
     );

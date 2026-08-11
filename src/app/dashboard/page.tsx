@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,18 @@ import {
   BarChart3,
 } from "lucide-react";
 
+interface DocItem {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  createdAt: string;
+  status: string;
+  analysis?: {
+    status: string;
+    shortSummary?: string;
+  } | null;
+}
+
 // Demo data for the dashboard (shown when no real data exists)
 const demoStats = [
   { label: "Total Documents", value: "0", icon: FileText, color: "text-blue-400", bgColor: "bg-blue-500/10", change: "Upload your first" },
@@ -39,6 +52,25 @@ const quickActions = [
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
+  const [documents, setDocuments] = useState<DocItem[]>([]);
+  const [fetchingDocs, setFetchingDocs] = useState(true);
+
+  useEffect(() => {
+    async function loadDocs() {
+      try {
+        const res = await fetch("/api/documents/upload");
+        if (res.ok) {
+          const data = await res.json();
+          setDocuments(data.documents || []);
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard documents:", err);
+      } finally {
+        setFetchingDocs(false);
+      }
+    }
+    loadDocs();
+  }, []);
 
   if (loading) {
     return (
@@ -57,6 +89,14 @@ export default function DashboardPage() {
   }
 
   const credits = user?.creditBalance?.amount ?? 15;
+  const completedAnalyses = documents.filter((d: DocItem) => d.analysis?.status === "COMPLETED").length;
+
+  const stats = [
+    { label: "Total Documents", value: documents.length.toString(), icon: FileText, color: "text-blue-400", bgColor: "bg-blue-500/10", change: documents.length > 0 ? `${documents.length} uploaded` : "Upload your first" },
+    { label: "AI Analyses", value: completedAnalyses.toString(), icon: Brain, color: "text-violet-400", bgColor: "bg-violet-500/10", change: completedAnalyses > 0 ? `${completedAnalyses} complete` : "Get started" },
+    { label: "Credits Remaining", value: credits.toString(), icon: Coins, color: "text-emerald-400", bgColor: "bg-emerald-500/10", change: `${user?.subscription?.plan?.name || "Free"} tier` },
+    { label: "Presentations", value: completedAnalyses > 0 ? completedAnalyses.toString() : "0", icon: Presentation, color: "text-amber-400", bgColor: "bg-amber-500/10", change: "Create one" },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -81,15 +121,13 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {demoStats.map((stat) => (
+        {stats.map((stat) => (
           <Card key={stat.label} className="hover:shadow-md transition-shadow">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-3xl font-bold mt-1">
-                    {stat.label === "Credits Remaining" ? credits : stat.value}
-                  </p>
+                  <p className="text-3xl font-bold mt-1">{stat.value}</p>
                   <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                     <TrendingUp className="w-3 h-3" />
                     {stat.change}
@@ -146,22 +184,51 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Empty State */}
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="p-4 rounded-2xl bg-muted/50 mb-4">
-                <FileText className="w-10 h-10 text-muted-foreground" />
+            {documents.length > 0 ? (
+              <div className="space-y-3">
+                {documents.map((doc: DocItem) => (
+                  <div key={doc.id} className="flex items-center justify-between p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm line-clamp-1">{doc.fileName}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {(doc.fileSize / (1024 * 1024)).toFixed(2)} MB • {new Date(doc.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={doc.status === "COMPLETED" ? "success" : "info"}>
+                        {doc.status}
+                      </Badge>
+                      <Link href="/dashboard/analysis">
+                        <Button variant="outline" size="sm" className="text-xs">
+                          View Analysis
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <h3 className="font-semibold mb-2">No documents yet</h3>
-              <p className="text-sm text-muted-foreground max-w-sm mb-4">
-                Upload your first research paper, project report, or dissertation to get started.
-              </p>
-              <Link href="/dashboard/upload">
-                <Button variant="outline" size="sm">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload Document
-                </Button>
-              </Link>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="p-4 rounded-2xl bg-muted/50 mb-4">
+                  <FileText className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold mb-2">No documents yet</h3>
+                <p className="text-sm text-muted-foreground max-w-sm mb-4">
+                  Upload your first research paper, project report, or dissertation to get started.
+                </p>
+                <Link href="/dashboard/upload">
+                  <Button variant="outline" size="sm">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Document
+                  </Button>
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
 

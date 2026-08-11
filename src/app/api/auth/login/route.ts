@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { seedDatabase } from "@/lib/db-seed";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   try {
+    await seedDatabase();
     const { email, password } = await req.json();
 
     if (!email || !password) {
@@ -16,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     // Find user
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: email.toLowerCase().trim() },
       select: {
         id: true,
         name: true,
@@ -24,7 +26,16 @@ export async function POST(req: NextRequest) {
         password: true,
         role: true,
         image: true,
+        userType: true,
+        researchAreas: true,
         onboardingCompleted: true,
+        profile: true,
+        creditBalance: {
+          select: { amount: true },
+        },
+        subscription: {
+          include: { plan: true },
+        },
       },
     });
 
@@ -45,11 +56,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create a simple session token (in production, use Auth.js properly)
+    // Create session token
     const sessionToken = crypto.randomUUID();
-
-    // Store session in DB
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
     await prisma.session.create({
       data: {
         sessionToken,
@@ -75,6 +85,8 @@ export async function POST(req: NextRequest) {
         email: user.email,
         role: user.role,
         image: user.image,
+        creditBalance: user.creditBalance,
+        subscription: user.subscription,
       },
       message: "Logged in successfully",
     });

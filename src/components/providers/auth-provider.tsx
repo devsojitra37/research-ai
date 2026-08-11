@@ -9,11 +9,25 @@ interface User {
   role: string;
   image: string | null;
   userType: string | null;
+  researchAreas?: string;
   onboardingCompleted: boolean;
+  profile?: {
+    bio: string | null;
+    institution: string | null;
+    department: string | null;
+    researchInterests: string;
+    website: string | null;
+    linkedin: string | null;
+    twitter: string | null;
+    googleScholar: string | null;
+    orcid: string | null;
+    isPublic: boolean;
+  } | null;
   creditBalance: { amount: number } | null;
   subscription: {
     plan: { name: string; slug: string };
     status: string;
+    billingCycle?: string;
   } | null;
 }
 

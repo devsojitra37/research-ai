@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Brain, Sparkles, Eye, EyeOff, ArrowRight, Globe } from "lucide-react";
+import { Brain, Sparkles, Eye, EyeOff, ArrowRight, Globe, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 export default function LoginPage() {
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { refreshUser } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,9 +37,51 @@ export default function LoginPage() {
       }
 
       toast.success("Welcome back!");
+      await refreshUser();
       router.push("/dashboard");
     } catch {
       toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    try {
+      // First try login with demo user
+      const demoEmail = "researcher@example.com";
+      const demoPassword = "Password123!";
+
+      let res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: demoEmail, password: demoPassword }),
+      });
+
+      if (!res.ok) {
+        // If demo user doesn't exist, create it
+        res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: "Dr. Alex Johnson",
+            email: demoEmail,
+            password: demoPassword,
+          }),
+        });
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Logged in as Demo Researcher!");
+        await refreshUser();
+        router.push("/dashboard");
+      } else {
+        toast.error(data.error || "Failed to log in with demo account");
+      }
+    } catch {
+      toast.error("Demo login error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -74,11 +118,22 @@ export default function LoginPage() {
             <CardDescription>Enter your credentials to access your dashboard</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Google Sign In */}
+            {/* Quick Demo Login Button */}
             <Button
               variant="outline"
-              className="w-full mb-4 h-11"
-              onClick={() => toast.info("Google sign-in requires OAuth configuration")}
+              className="w-full mb-3 h-11 border-primary/30 text-primary hover:bg-primary/5 font-semibold"
+              onClick={handleDemoLogin}
+              disabled={loading}
+            >
+              <Zap className="w-4 h-4 mr-2 text-amber-500 fill-amber-500" />
+              Quick Demo Login (One-Click)
+            </Button>
+
+            {/* Google Sign In */}
+            <Button
+              variant="ghost"
+              className="w-full mb-4 h-10 text-xs border border-border"
+              onClick={() => toast.info("Google OAuth is enabled in production when AUTH_GOOGLE_ID is set.")}
             >
               <Globe className="w-4 h-4 mr-2" />
               Continue with Google
@@ -148,7 +203,7 @@ export default function LoginPage() {
                 ) : (
                   <>
                     Sign In
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </>
                 )}
               </Button>

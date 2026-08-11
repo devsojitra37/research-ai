@@ -31,6 +31,8 @@ import {
   Copy,
 } from "lucide-react";
 
+import { ScoreGauge } from "@/components/ui/score-gauge";
+
 export default function AnalysisPage() {
   const [activeTab, setActiveTab] = useState<"summary" | "quality" | "methodology" | "findings">("summary");
   const data = sampleAnalysisData;
@@ -85,17 +87,14 @@ export default function AnalysisPage() {
 
       {/* Primary KPI Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500/5 to-violet-500/5 border-primary/20">
+        <Card className="bg-gradient-to-br from-blue-500/5 to-violet-500/5 border-primary/20 glow-card">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Research Quality</p>
-                <p className="text-3xl font-extrabold text-primary mt-1">{data.qualityScore.overall}<span className="text-lg text-muted-foreground font-normal">/100</span></p>
                 <p className="text-xs text-emerald-400 font-medium mt-1">Excellent Methodology</p>
               </div>
-              <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-                <Award className="w-6 h-6" />
-              </div>
+              <ScoreGauge score={data.qualityScore.overall} size={68} strokeWidth={7} />
             </div>
           </CardContent>
         </Card>

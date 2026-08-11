@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { NeuralParticles } from "@/components/ui/neural-particles";
 import {
   ArrowRight,
   FileText,
@@ -19,6 +20,7 @@ import {
 export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16" id="hero">
+      <NeuralParticles particleCount={55} />
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Gradient Orbs */}

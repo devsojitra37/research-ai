@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState([
+  const [projects, setProjects] = useState<any[]>([
     {
       id: "p1",
       name: "Final Year AI Project: HeartNet Arrhythmia",
@@ -51,18 +51,56 @@ export default function ProjectsPage() {
     },
   ]);
 
-  const handleCreateProject = () => {
-    const newProj = {
-      id: `p${Date.now()}`,
-      name: "New Research Workspace",
-      description: "Organized documents, AI analyses, slide decks, and citations.",
-      visibility: "PRIVATE",
-      documentCount: 1,
-      updatedAt: "Just now",
-      shareToken: `workspace-${Date.now()}`,
-    };
-    setProjects([newProj, ...projects]);
-    toast.success("Created new research workspace!");
+  const loadProjects = async () => {
+    try {
+      const res = await fetch("/api/projects");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.projects && data.projects.length > 0) {
+          const mapped = data.projects.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description || "Organized research workspace",
+            visibility: p.visibility,
+            documentCount: p._count?.documents ?? 0,
+            updatedAt: new Date(p.updatedAt).toLocaleDateString(),
+            shareToken: p.shareToken || p.id,
+          }));
+          setProjects(mapped);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load projects:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const handleCreateProject = async () => {
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `Research Workspace #${projects.length + 1}`,
+          description: "Organized documents, AI analyses, slide decks, and citations.",
+          visibility: "PRIVATE",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to create workspace");
+        return;
+      }
+
+      toast.success("Created new research workspace!");
+      await loadProjects();
+    } catch {
+      toast.error("Failed to create workspace.");
+    }
   };
 
   return (

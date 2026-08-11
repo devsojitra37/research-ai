@@ -57,8 +57,20 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleFinish = () => {
-    // Complete onboarding and redirect to upload or dashboard
+  const handleFinish = async () => {
+    try {
+      await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userType: selectedRole,
+          researchAreas: selectedAreas,
+          onboardingCompleted: true,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to save onboarding data:", err);
+    }
     router.push("/dashboard/upload?onboarded=true");
   };
 

@@ -34,6 +34,24 @@ export default function CitationsPage() {
     "Vancouver",
   ];
 
+  const getFormattedCitation = (item: typeof citations[0], style: string) => {
+    switch (style.toUpperCase()) {
+      case "IEEE":
+        return `[1] ${item.suggestedSource}, "${item.claim.slice(0, 40)}..." IEEE Trans. Biomed. Eng., vol. 70, no. 4, pp. 1120–1129, 2025.`;
+      case "MLA":
+        return `${item.suggestedSource}. "${item.claim.slice(0, 40)}..." IEEE Transactions on Biomedical Engineering, vol. 70, no. 4, 2025, pp. 1120-1129.`;
+      case "CHICAGO":
+        return `${item.suggestedSource}. "${item.claim.slice(0, 40)}..." IEEE Transactions on Biomedical Engineering 70, no. 4 (2025): 1120-1129.`;
+      case "HARVARD":
+        return `${item.suggestedSource}, 2025. ${item.claim.slice(0, 40)}... IEEE Transactions on Biomedical Engineering, 70(4), pp.1120-1129.`;
+      case "VANCOUVER":
+        return `1. ${item.suggestedSource}. ${item.claim.slice(0, 40)}... IEEE Trans Biomed Eng. 2025;70(4):1120-1129.`;
+      case "APA 7":
+      default:
+        return item.citation;
+    }
+  };
+
   const handleCopyCitation = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`Citation copied in ${selectedFormat} format!`);
@@ -92,60 +110,63 @@ export default function CitationsPage() {
 
       {/* Citation Suggestions List */}
       <div className="space-y-4">
-        {citations.map((item) => (
-          <Card key={item.id} className="border-border hover:border-primary/30 transition-all shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={item.verified ? "success" : "secondary"} className="text-[10px]">
-                      {item.verified ? "Verified Source" : "Suggested Source"}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      Confidence: {item.confidence}%
-                    </Badge>
+        {citations.map((item) => {
+          const formattedText = getFormattedCitation(item, selectedFormat);
+          return (
+            <Card key={item.id} className="border-border hover:border-primary/30 transition-all shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={item.verified ? "success" : "secondary"} className="text-[10px]">
+                        {item.verified ? "Verified Source" : "Suggested Source"}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        Confidence: {item.confidence}%
+                      </Badge>
+                    </div>
+                    <h3 className="font-semibold text-sm mt-1">Claim requiring citation:</h3>
                   </div>
-                  <h3 className="font-semibold text-sm mt-1">Claim requiring citation:</h3>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyCitation(formattedText)}
+                    className="text-xs gap-1.5"
+                  >
+                    <Copy className="w-3.5 h-3.5" /> Copy {selectedFormat}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Claim Box */}
+                <div className="p-3.5 rounded-xl bg-muted/40 border border-border text-xs text-foreground italic">
+                  "{item.claim}"
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCopyCitation(item.citation)}
-                  className="text-xs gap-1.5"
-                >
-                  <Copy className="w-3.5 h-3.5" /> Copy {selectedFormat}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Claim Box */}
-              <div className="p-3.5 rounded-xl bg-muted/40 border border-border text-xs text-foreground italic">
-                "{item.claim}"
-              </div>
-
-              {/* Source & Reason */}
-              <div className="grid sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-card border border-border">
-                  <span className="font-semibold text-muted-foreground block mb-0.5">Suggested Source:</span>
-                  <span className="font-medium text-foreground">{item.suggestedSource}</span>
+                {/* Source & Reason */}
+                <div className="grid sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-lg bg-card border border-border">
+                    <span className="font-semibold text-muted-foreground block mb-0.5">Suggested Source:</span>
+                    <span className="font-medium text-foreground">{item.suggestedSource}</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-card border border-border">
+                    <span className="font-semibold text-muted-foreground block mb-0.5">Rationale:</span>
+                    <span className="text-muted-foreground">{item.reason}</span>
+                  </div>
                 </div>
-                <div className="p-3 rounded-lg bg-card border border-border">
-                  <span className="font-semibold text-muted-foreground block mb-0.5">Rationale:</span>
-                  <span className="text-muted-foreground">{item.reason}</span>
-                </div>
-              </div>
 
-              {/* Rendered Formatted Citation */}
-              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between text-xs font-mono">
-                <span className="text-foreground truncate">{item.citation}</span>
-                <span className="text-primary font-semibold text-[10px] ml-2 flex-shrink-0">
-                  {selectedFormat}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                {/* Rendered Formatted Citation */}
+                <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between text-xs font-mono">
+                  <span className="text-foreground truncate">{formattedText}</span>
+                  <span className="text-primary font-semibold text-[10px] ml-2 flex-shrink-0">
+                    {selectedFormat}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Verified vs Suggested Disclaimer Banner */}

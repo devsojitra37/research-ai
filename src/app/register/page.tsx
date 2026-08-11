@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,6 +17,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { refreshUser } = useAuth();
 
   const passwordChecks = [
     { label: "At least 8 characters", valid: password.length >= 8 },
@@ -41,8 +43,9 @@ export default function RegisterPage() {
         return;
       }
 
-      toast.success("Account created! Redirecting...");
-      router.push("/dashboard");
+      toast.success("Account created! Redirecting to onboarding...");
+      await refreshUser();
+      router.push("/onboarding");
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -78,14 +81,14 @@ export default function RegisterPage() {
         <Card className="shadow-xl border-border/50">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl">Create Account</CardTitle>
-            <CardDescription>Start with 3 free document analyses per month</CardDescription>
+            <CardDescription>Start with 15 free starter AI credits</CardDescription>
           </CardHeader>
           <CardContent>
             {/* Google Sign Up */}
             <Button
               variant="outline"
               className="w-full mb-4 h-11"
-              onClick={() => toast.info("Google sign-in requires OAuth configuration")}
+              onClick={() => toast.info("Google OAuth is available when AUTH_GOOGLE_ID is configured.")}
             >
               <Globe className="w-4 h-4 mr-2" />
               Continue with Google
@@ -177,7 +180,7 @@ export default function RegisterPage() {
                 ) : (
                   <>
                     Create Free Account
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </>
                 )}
               </Button>

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { seedDatabase } from "@/lib/db-seed";
 import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   try {
+    await seedDatabase();
     const { name, email, password } = await req.json();
 
     // Validation
@@ -23,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     // Check for existing user
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: email.toLowerCase().trim() },
     });
 
     if (existingUser) {
@@ -39,28 +42,67 @@ export async function POST(req: NextRequest) {
     // Generate referral code
     const referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    // Create user
+    // Get Free plan
+    const freePlan = await prisma.plan.findUnique({
+      where: { slug: "FREE" },
+    });
+
+    // Create user with default subscription and credits
     const user = await prisma.user.create({
       data: {
         name,
-        email: email.toLowerCase(),
+        email: email.toLowerCase().trim(),
         password: hashedPassword,
         referralCode,
         creditBalance: {
           create: {
-            amount: 15, // Free tier starting credits
+            amount: 15, // Starter credits
           },
         },
         profile: {
           create: {},
         },
+        ...(freePlan && {
+          subscription: {
+            create: {
+              planId: freePlan.id,
+              status: "ACTIVE",
+              currentPeriodStart: new Date(),
+              currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            },
+          },
+        }),
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+        image: true,
+        onboardingCompleted: true,
       },
+    });
+
+    // Auto-create session on registration
+    const sessionToken = crypto.randomUUID();
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    await prisma.session.create({
+      data: {
+        sessionToken,
+        userId: user.id,
+        expires,
+      },
+    });
+
+    // Set HTTP-only session cookie
+    const cookieStore = await cookies();
+    cookieStore.set("session-token", sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      expires,
+      path: "/",
     });
 
     return NextResponse.json(
