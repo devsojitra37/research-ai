@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
-  const baseUrl = process.env.NEXTAUTH_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+  const host = req.headers.get("host") || "localhost:3000";
+  const protocol = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  const baseUrl = process.env.NEXTAUTH_URL || `${protocol}://${host}`;
   const redirectUri = `${baseUrl}/api/auth/google`;
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET;
@@ -154,7 +156,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Step 2: Initiate OAuth flow if credentials exist, else fallback to instant Demo Google Login
+  // Step 2: Initiate OAuth flow if credentials exist
   if (clientId) {
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
       clientId
@@ -165,7 +167,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(googleAuthUrl);
   }
 
-  // Step 3: Immediate Demo Google Login when env keys are not yet configured in local dev
+  // Step 3: Immediate Demo Google Login when env keys are not yet configured
   try {
     const demoEmail = "google.researcher@university.edu";
     let user = await prisma.user.findUnique({ where: { email: demoEmail } });
